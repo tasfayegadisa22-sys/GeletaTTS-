@@ -1,3 +1,71 @@
-mkdir -p app/src/main/java/com/geleta/tts
-mkdir -p app/src/main/assets
-mkdir -p app/src/main/res/xml  
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Geleta TTS Settings"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="32dp"
+        android:focusable="true"
+        android:contentDescription="የገሌታ ቲቲኤስ ማስተካከያ ገጽ" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Speech Rate (የንግግር ፍጥነት)"
+        android:textSize="18sp"
+        android:labelFor="@+id/seek_speed" />
+    <SeekBar
+        android:id="@+id/seek_speed"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="50"
+        android:layout_marginBottom="24dp"
+        android:contentDescription="የንግግር ፍጥነት መቆጣጠሪያ" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pitch (የድምጽ ቅላጼ)"
+        android:textSize="18sp"
+        android:labelFor="@+id/seek_pitch" />
+    <SeekBar
+        android:id="@+id/seek_pitch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="50"
+        android:layout_marginBottom="24dp"
+        android:contentDescription="የድምጽ ቅላጼ መቆጣጠሪያ" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Volume (የድምጽ መጠን)"
+        android:textSize="18sp"
+        android:labelFor="@+id/seek_volume" />
+    <SeekBar
+        android:id="@+id/seek_volume"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="100"
+        android:layout_marginBottom="32dp"
+        android:contentDescription="የድምጽ መጠን መቆጣጠሪያ" />
+
+    <Button
+        android:id="@+id/btn_save"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:text="Save Settings (ሴቭ አድርግ)"
+        android:textSize="20sp"
+        android:contentDescription="ማስተካከያዎቹን ሴቭ ማድረጊያ ቁልፍ" />
+
+</LinearLayout>
