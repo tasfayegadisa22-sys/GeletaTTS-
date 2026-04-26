@@ -2,7 +2,7 @@
 gender female
 pitch 200 300
 flutter 1
-stressAmp 20 18  20 20  20 22  22 22
+    stressAmp 20 18  20 20  20 22  22 22
 echo 10 10000
 
 roughness 0
