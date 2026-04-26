@@ -25,9 +25,13 @@ jobs:
       with:
         gradle-version: 8.4
 
-    - name: List Files (Debugging)
-      run: find . -maxdepth 10 -not -path '*/.*'
-      # ይህ ትዕዛዝ ፋይሎችህ የት የት እንዳሉ ለጥቁሩ ስክሪን ይነግረናል
+    - name: Fix Nested Folder Structure
+      run: |
+        if [ -d "app/app" ]; then
+          echo "Nested app folder found. Fixing..."
+          cp -r app/app/* app/
+          rm -rf app/app
+        fi
 
     - name: Build with Gradle
       run: gradle assembleDebug --stacktrace
@@ -36,4 +40,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: GeletaTTS-Debug-APK
-        path: "**/build/outputs/apk/debug/*.apk"
+        path: "**/build/outputs/apk/debug/*.apk
