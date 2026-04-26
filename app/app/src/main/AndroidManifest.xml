@@ -1,12 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.geleta.tts">
+
     <application
         android:label="GeletaTTS"
-        android:allowBackup="true">
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".GeletaTtsService"
-            android:label="GeletaTTS Amharic"
+            android:label="GeletaTTS Engine"
             android:permission="android.permission.BIND_TEXT_TO_SPEECH"
             android:exported="true">
             <intent-filter>
@@ -17,5 +29,6 @@
                 android:name="android.speech.tts"
                 android:resource="@xml/tts_engine" />
         </service>
+
     </application>
 </manifest>
