@@ -1,4 +1,4 @@
-  name: Build GeletaTTS APK
+name: Build GeletaTTS APK
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -31,4 +31,4 @@ runs-on: ubuntu-latest
       uses: actions/upload-artifact@v4
       with:
         name: GeletaTTS-Debug-APK
-        path: "**/build/outputs/apk/debug/*.apk"
+        path: "**/build/outputs/apk/debug/*.apk"  
