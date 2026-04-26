@@ -25,6 +25,10 @@ jobs:
       with:
         gradle-version: 8.4
 
+    - name: List Files (Debugging)
+      run: find . -maxdepth 10 -not -path '*/.*'
+      # ይህ ትዕዛዝ ፋይሎችህ የት የት እንዳሉ ለጥቁሩ ስክሪን ይነግረናል
+
     - name: Build with Gradle
       run: gradle assembleDebug --stacktrace
 
