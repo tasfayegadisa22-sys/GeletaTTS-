@@ -25,36 +25,43 @@ jobs:
       with:
         gradle-version: 8.4
 
-    - name: Download Missing Voice Files
+    - name: Fix Nested Folder Structure
       run: |
-        # አስፈላጊ ፋይሎችን ከ eSpeak NG ኦፊሴላዊ ገጽ ዳውንሎድ ማድረግ
-        # ለአማርኛ
-        if [ ! -f "am" ]; then
-          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/am -o am
+        # 1. ፋይሎቹ GeletaTTS- በሚል ሌላ ፎልደር ውስጥ ከሆኑ አውጥቶ ዋናው ገጽ ላይ ያደርጋቸዋል
+        if [ -d "GeletaTTS-" ]; then
+          echo "Nested folder found. Moving contents..."
+          mv GeletaTTS-/* . 2>/dev/null || true
+          mv GeletaTTS-/.* . 2>/dev/null || true
         fi
         
-        # ለኦሮምኛ
-        if [ ! -f "om" ]; then
-          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/om -o om
+        # 2. አፑ በ app/app መልክ ተደራርቦ ከሆነ ያስተካክላል
+        if [ -d "app/app" ]; then
+          echo "Fixing app/app structure..."
+          cp -r app/app/* app/
+          rm -rf app/app
         fi
 
-        # ለእንግሊዝኛ
-        if [ ! -f "en" ]; then
-          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/default/en-us -o en
-        fi
-
-    - name: Move TTS Data Files to Assets
+    - name: Download Missing Voice Files
       run: |
         mkdir -p app/src/main/assets/geleta-tts-data
         
-        # ቅጥያ የሌላቸውን ፋይሎች በሙሉ (am, om, phondata, ወዘተ) ማዛወር
+        # ለአማርኛ
+        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/am -o app/src/main/assets/geleta-tts-data/am
+        
+        # ለኦሮምኛ
+        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/om -o app/src/main/assets/geleta-tts-data/om
+        
+        # ለእንግሊዝኛ
+        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/default/en-us -o app/src/main/assets/geleta-tts-data/en
+
+    - name: Move TTS Data Files to Assets
+      run: |
+        # ዋናው ገጽ ላይ ያሉትን የዳታ ፋይሎች ወደ assets ማዛወር
         for file in *; do
           if [ -f "$file" ] && [[ "$file" != *.* ]]; then
             mv "$file" app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
           fi
         done
-        
-        echo "ሁሉም ፋይሎች (ወርደውም ሆነ ተገኝተው) ተዘጋጅተዋል!"
 
     - name: Build with Gradle
       run: gradle assembleDebug --stacktrace
