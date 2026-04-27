@@ -25,27 +25,36 @@ jobs:
       with:
         gradle-version: 8.4
 
-    - name: Fix Nested Folder Structure
+    - name: Download Missing Voice Files
       run: |
-        if [ -d "app/app" ]; then
-          echo "Nested app folder found. Fixing..."
-          cp -r app/app/* app/
-          rm -rf app/app
+        # አስፈላጊ ፋይሎችን ከ eSpeak NG ኦፊሴላዊ ገጽ ዳውንሎድ ማድረግ
+        # ለአማርኛ
+        if [ ! -f "am" ]; then
+          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/am -o am
+        fi
+        
+        # ለኦሮምኛ
+        if [ ! -f "om" ]; then
+          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/om -o om
+        fi
+
+        # ለእንግሊዝኛ
+        if [ ! -f "en" ]; then
+          curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/default/en-us -o en
         fi
 
     - name: Move TTS Data Files to Assets
       run: |
-        # ፎልደሩን መፍጠር
         mkdir -p app/src/main/assets/geleta-tts-data
         
-        # ፋይሎቹን ከዋናው ገጽ ፈልጎ ወደ ፎልደሩ ማዛወር
-        mv am_dict app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
-        mv phondata app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
-        mv phondata-manifest app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
-        mv phonindex app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
-        mv phontab app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        # ቅጥያ የሌላቸውን ፋይሎች በሙሉ (am, om, phondata, ወዘተ) ማዛወር
+        for file in *; do
+          if [ -f "$file" ] && [[ "$file" != *.* ]]; then
+            mv "$file" app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+          fi
+        done
         
-        echo "የ eSpeak NG ዳታ ፋይሎች ወደ ትክክለኛው ቦታ ተዛውረዋል!"
+        echo "ሁሉም ፋይሎች (ወርደውም ሆነ ተገኝተው) ተዘጋጅተዋል!"
 
     - name: Build with Gradle
       run: gradle assembleDebug --stacktrace
