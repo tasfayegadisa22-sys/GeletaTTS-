@@ -12,7 +12,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -32,6 +32,20 @@ jobs:
           cp -r app/app/* app/
           rm -rf app/app
         fi
+
+    - name: Move TTS Data Files to Assets
+      run: |
+        # ፎልደሩን መፍጠር
+        mkdir -p app/src/main/assets/geleta-tts-data
+        
+        # ፋይሎቹን ከዋናው ገጽ ፈልጎ ወደ ፎልደሩ ማዛወር
+        mv am_dict app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        mv phondata app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        mv phondata-manifest app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        mv phonindex app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        mv phontab app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
+        
+        echo "የ eSpeak NG ዳታ ፋይሎች ወደ ትክክለኛው ቦታ ተዛውረዋል!"
 
     - name: Build with Gradle
       run: gradle assembleDebug --stacktrace
