@@ -27,20 +27,31 @@ jobs:
 
       - name: Locate and Organize Files
         run: |
+          # ፋይሎቹ ተደራርበው ከሆነ ወደ ዋናው ገጽ ያወጣቸዋል
+          if [ -d "GeletaTTS-" ]; then
+            mv GeletaTTS-/* . 2>/dev/null || true
+          fi
+
+          # lang.zip ካለ መፍታት
           ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
           if [ -n "$ZIP_PATH" ]; then
             unzip -o "$ZIP_PATH" -d temp_lang/
             mkdir -p app/src/main/assets/geleta-tts-data/
             find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            ZIP_DIR=$(dirname "$ZIP_PATH")
-            find "$ZIP_DIR" -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
             rm -rf temp_lang/
-          else
-            echo "ማሳሰቢያ: lang.zip አልተገኘም"
           fi
 
       - name: Build APK
         run: |
+          # gradlew ፋይል ያለበትን ፈልጎ ወደ ዋናው ገጽ ማምጣት
+          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
+          if [ -n "$GRADLEW_PATH" ]; then
+            cp "$GRADLEW_PATH" ./gradlew
+          else
+            # ፋይሉ ከጠፋ አዲስ እንዲፈጥር ማዘዝ
+            gradle wrapper
+          fi
+          
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
 
@@ -48,4 +59,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GeletaTTS-App
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/build/outputs/apk/debug/*.apk"
