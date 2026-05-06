@@ -28,28 +28,28 @@ jobs:
       - name: Locate and Organize Files
         run: |
           echo "--- ፋይሎችን በመፈለግ ላይ ---"
-          # ሁሉንም ያሉትን ፋይሎች ዝርዝር በሎግ ላይ ያሳያል (ለእኛ እንዲረዳን)
-          find . -maxdepth 3 -not -path '*/.*'
           
-          # lang.zip የትም ቦታ ቢሆን ፈልገህ አግኘው
-          ZIP_PATH=$(find . -name "lang.zip" | head -n 1)
+          # ፋይሉን ያለምንም የፊደል ልዩነት (Case-insensitive) ፈልግ
+          ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
           
           if [ -n "$ZIP_PATH" ]; then
-            echo "ተገኝቷል: $ZIP_PATH"
+            echo "ፋይሉ እዚህ ተገኝቷል: $ZIP_PATH"
             unzip -o "$ZIP_PATH" -d temp_lang/
             mkdir -p app/src/main/assets/geleta-tts-data/
             
-            # ፋይሎቹን ከውስጥ ፎልደሮች አውጥቶ ወደ አንድ ቦታ መገልበጥ
+            # ፋይሎቹን ወደ አሴትስ መገልበጥ
             find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
             
-            # ከዚፑ አጠገብ ያሉትን (am_dict ወዘተ) መገልበጥ
+            # ሌሎች ተጓዳኝ ፋይሎችን (am_dict, phondata ወዘተ) መፈለግ እና መገልበጥ
             ZIP_DIR=$(dirname "$ZIP_PATH")
             find "$ZIP_DIR" -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
             
             rm -rf temp_lang/
-            echo "--- ዝግጅት ተጠናቋል ---"
+            echo "ዝግጅት ተጠናቋል።"
           else
-            echo "ስህተት: lang.zip ፋይል በየትኛውም ቦታ አልተገኘም!"
+            echo "--- ስህተት: lang.zip ፋይል በፕሮጀክቱ ውስጥ አልተገኘም! ---"
+            echo "ያሉ ፋይሎች ዝርዝር፦"
+            find . -maxdepth 3 -not -path '*/.*'
             exit 1
           fi
 
