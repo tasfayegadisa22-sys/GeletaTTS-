@@ -1,4 +1,51 @@
-- name: Build APK
+name: Build GeletaTTS APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Locate and Organize Files
+        run: |
+          ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
+          if [ -n "$ZIP_PATH" ]; then
+            unzip -o "$ZIP_PATH" -d temp_lang/
+            mkdir -p app/src/main/assets/geleta-tts-data/
+            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            ZIP_DIR=$(dirname "$ZIP_PATH")
+            find "$ZIP_DIR" -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            rm -rf temp_lang/
+          else
+            echo "ማሳሰቢያ: lang.zip አልተገኘም"
+          fi
+
+      - name: Build APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace --info
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeletaTTS-App
+          path: app/build/outputs/apk/debug/*.apk
