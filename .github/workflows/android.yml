@@ -1,23 +1,56 @@
-- name: Extract Voice Data and Organize
+name: Build GeletaTTS APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
+      - name: Extract Voice Data and Organize
         run: |
-          # 1. ዚፕ ፋይሉን መፍታት (Unzip)
-          unzip lang.zip -d temp_lang/
-          
-          # 2. የገለታ ቲቲኤስ ዳታ ፎልደር መፍጠር (ከሌለ)
-          mkdir -p app/src/main/assets/geleta-tts-data/
-          
-          # 3. ፋይሎቹን ከ 'lang' ውስጥ ወደ ዋናው ቦታ መገልበጥ
-          # 'find' ትዕዛዝ ሁሉንም ፋይሎች በርብሮ ያገኛል
-          find temp_lang/ -type f -exec cp {} app/src/main/assets/geleta-tts-data/ \;
-          
-          # 4. ትርፍ የሆኑ ፋይሎችን ማጽዳት
-          rm lang.zip
-          rm -rf temp_lang/
+          # ዚፕ ፋይሉ ካለ ብቻ እንዲሰራ ማረጋገጫ
+          if [ -f "lang.zip" ]; then
+            unzip lang.zip -d temp_lang/
+            mkdir -p app/src/main/assets/geleta-tts-data/
+            find temp_lang/ -type f -exec cp {} app/src/main/assets/geleta-tts-data/ \;
+            rm lang.zip
+            rm -rf temp_lang/
+          else
+            echo "lang.zip አልተገኘም፣ ወደ ቀጣዩ ስራ ያልፋል..."
+          fi
 
       - name: Commit Organized Files
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add app/src/main/assets/geleta-tts-data/
-          git commit -m "Organized voice files from zip" || echo "No changes to commit"
-          git push
+          # አዲስ ፋይል ከተጨመረ ብቻ Commit ያደርጋል
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Organized voice files from zip" && git push)
+
+      - name: Build with Gradle
+        run: chmod +x ./gradlew && ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeletaTTS-App
+          path: app/build/outputs/apk/debug/app-debug.apk
