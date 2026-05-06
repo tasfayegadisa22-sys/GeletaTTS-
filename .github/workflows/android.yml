@@ -25,11 +25,18 @@ jobs:
       - name: Setup Gradle 8.4
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.4  # እዚህ ጋር ስሪቱን በግልጽ ወስነነዋል
+          gradle-version: 8.4
 
-      - name: Organize Files
+      - name: Fix Folder Structure and Organize Files
         run: |
-          # ፋይሎቹን ማደራጀት
+          # 1. ፋይሎቹ GeletaTTS- በሚል የተደራረበ ፎልደር ውስጥ ከሆኑ አውጥቶ ዋናው ገጽ ላይ ያደርጋቸዋል
+          if [ -d "GeletaTTS-" ]; then
+            echo "የተደራረበ ፎልደር ተገኝቷል። ፋይሎቹን ወደ ውጭ በማውጣት ላይ..."
+            mv GeletaTTS-/* . 2>/dev/null || true
+            mv GeletaTTS-/.* . 2>/dev/null || true
+          fi
+
+          # 2. ዚፕ ፋይሉን ፈልጎ መፍታት እና ማደራጀት
           ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
           if [ -n "$ZIP_PATH" ]; then
             unzip -o "$ZIP_PATH" -d temp_lang/
@@ -40,9 +47,19 @@ jobs:
 
       - name: Build APK
         run: |
-          # gradlew ፋይል ከሌለ አዲስ በ 8.4 ስሪት እንዲሰራ ማድረግ
-          if [ ! -f "gradlew" ]; then
+          # gradlew ፋይል ያለበትን ፈልጎ ወደ ዋናው ገጽ ማምጣት
+          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
+          if [ -n "$GRADLEW_PATH" ]; then
+            cp "$GRADLEW_PATH" ./gradlew
+          else
             gradle wrapper --gradle-version 8.4
           fi
+          
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeletaTTS-App
+          path: "**/build/outputs/apk/debug/*.apk"
