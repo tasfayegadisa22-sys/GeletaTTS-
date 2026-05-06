@@ -22,17 +22,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.4
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.4  # እዚህ ጋር ስሪቱን በግልጽ ወስነነዋል
 
-      - name: Locate and Organize Files
+      - name: Organize Files
         run: |
-          # ፋይሎቹ ተደራርበው ከሆነ ወደ ዋናው ገጽ ያወጣቸዋል
-          if [ -d "GeletaTTS-" ]; then
-            mv GeletaTTS-/* . 2>/dev/null || true
-          fi
-
-          # lang.zip ካለ መፍታት
+          # ፋይሎቹን ማደራጀት
           ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
           if [ -n "$ZIP_PATH" ]; then
             unzip -o "$ZIP_PATH" -d temp_lang/
@@ -43,20 +40,9 @@ jobs:
 
       - name: Build APK
         run: |
-          # gradlew ፋይል ያለበትን ፈልጎ ወደ ዋናው ገጽ ማምጣት
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -n "$GRADLEW_PATH" ]; then
-            cp "$GRADLEW_PATH" ./gradlew
-          else
-            # ፋይሉ ከጠፋ አዲስ እንዲፈጥር ማዘዝ
-            gradle wrapper
+          # gradlew ፋይል ከሌለ አዲስ በ 8.4 ስሪት እንዲሰራ ማድረግ
+          if [ ! -f "gradlew" ]; then
+            gradle wrapper --gradle-version 8.4
           fi
-          
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GeletaTTS-App
-          path: "**/build/outputs/apk/debug/*.apk"
