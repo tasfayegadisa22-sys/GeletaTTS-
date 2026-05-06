@@ -23,36 +23,35 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          cache-disabled: true
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Extract and Flatten Zip
+      - name: Locate and Organize Files
         run: |
-          # ዚፕ ፋይሉ ያለበትን ትክክለኛ ቦታ መፈለግ
-          if [ -f "geleta-tts-data/lang.zip" ]; then
-            ZIP_FILE="geleta-tts-data/lang.zip"
-          elif [ -f "lang.zip" ]; then
-            ZIP_FILE="lang.zip"
+          echo "--- ፋይሎችን በመፈለግ ላይ ---"
+          # ሁሉንም ያሉትን ፋይሎች ዝርዝር በሎግ ላይ ያሳያል (ለእኛ እንዲረዳን)
+          find . -maxdepth 3 -not -path '*/.*'
+          
+          # lang.zip የትም ቦታ ቢሆን ፈልገህ አግኘው
+          ZIP_PATH=$(find . -name "lang.zip" | head -n 1)
+          
+          if [ -n "$ZIP_PATH" ]; then
+            echo "ተገኝቷል: $ZIP_PATH"
+            unzip -o "$ZIP_PATH" -d temp_lang/
+            mkdir -p app/src/main/assets/geleta-tts-data/
+            
+            # ፋይሎቹን ከውስጥ ፎልደሮች አውጥቶ ወደ አንድ ቦታ መገልበጥ
+            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            
+            # ከዚፑ አጠገብ ያሉትን (am_dict ወዘተ) መገልበጥ
+            ZIP_DIR=$(dirname "$ZIP_PATH")
+            find "$ZIP_DIR" -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            
+            rm -rf temp_lang/
+            echo "--- ዝግጅት ተጠናቋል ---"
           else
-            echo "ስህተት: lang.zip ፋይል አልተገኘም!"
+            echo "ስህተት: lang.zip ፋይል በየትኛውም ቦታ አልተገኘም!"
             exit 1
           fi
-
-          echo "$ZIP_FILE ተገኝቷል፣ መፍታት እየተጀመረ ነው..."
-          unzip -o "$ZIP_FILE" -d temp_lang/
-          mkdir -p app/src/main/assets/geleta-tts-data/
-          
-          # ከዚፑ የወጡ ፋይሎችን ወደ አሴትስ መገልበጥ
-          find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-          
-          # በ ፎልደሩ ውስጥ የነበሩ ሌሎች ፋይሎችንም (am_dict ወዘተ) መገልበጥ
-          if [ -d "geleta-tts-data" ]; then
-            find geleta-tts-data/ -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-          fi
-
-          rm -rf temp_lang/
-          echo "ፋይሎች በተሳካ ሁኔታ ተደራጅተዋል።"
 
       - name: Build APK
         run: |
