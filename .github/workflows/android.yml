@@ -1,73 +1,23 @@
-name: Build GeletaTTS APK
+- name: Extract Voice Data and Organize
+        run: |
+          # 1. ዚፕ ፋይሉን መፍታት (Unzip)
+          unzip lang.zip -d temp_lang/
+          
+          # 2. የገለታ ቲቲኤስ ዳታ ፎልደር መፍጠር (ከሌለ)
+          mkdir -p app/src/main/assets/geleta-tts-data/
+          
+          # 3. ፋይሎቹን ከ 'lang' ውስጥ ወደ ዋናው ቦታ መገልበጥ
+          # 'find' ትዕዛዝ ሁሉንም ፋይሎች በርብሮ ያገኛል
+          find temp_lang/ -type f -exec cp {} app/src/main/assets/geleta-tts-data/ \;
+          
+          # 4. ትርፍ የሆኑ ፋይሎችን ማጽዳት
+          rm lang.zip
+          rm -rf temp_lang/
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
-
-    - name: Setup Gradle 8.4
-      uses: gradle/actions/setup-gradle@v4
-      with:
-        gradle-version: 8.4
-
-    - name: Fix Nested Folder Structure
-      run: |
-        # 1. ፋይሎቹ GeletaTTS- በሚል ሌላ ፎልደር ውስጥ ከሆኑ አውጥቶ ዋናው ገጽ ላይ ያደርጋቸዋል
-        if [ -d "GeletaTTS-" ]; then
-          echo "Nested folder found. Moving contents..."
-          mv GeletaTTS-/* . 2>/dev/null || true
-          mv GeletaTTS-/.* . 2>/dev/null || true
-        fi
-        
-        # 2. አፑ በ app/app መልክ ተደራርቦ ከሆነ ያስተካክላል
-        if [ -d "app/app" ]; then
-          echo "Fixing app/app structure..."
-          cp -r app/app/* app/
-          rm -rf app/app
-        fi
-
-    - name: Download Missing Voice Files
-      run: |
-        mkdir -p app/src/main/assets/geleta-tts-data
-        
-        # ለአማርኛ
-        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/am -o app/src/main/assets/geleta-tts-data/am
-        
-        # ለኦሮምኛ
-        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/africa/om -o app/src/main/assets/geleta-tts-data/om
-        
-        # ለእንግሊዝኛ
-        curl -L https://raw.githubusercontent.com/espeak-ng/espeak-ng/master/espeak-ng-data/voices/default/en-us -o app/src/main/assets/geleta-tts-data/en
-
-    - name: Move TTS Data Files to Assets
-      run: |
-        # ዋናው ገጽ ላይ ያሉትን የዳታ ፋይሎች ወደ assets ማዛወር
-        for file in *; do
-          if [ -f "$file" ] && [[ "$file" != *.* ]]; then
-            mv "$file" app/src/main/assets/geleta-tts-data/ 2>/dev/null || true
-          fi
-        done
-
-    - name: Build with Gradle
-      run: gradle assembleDebug --stacktrace
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: GeletaTTS-Debug-APK
-        path: "**/build/outputs/apk/debug/*.apk"
+      - name: Commit Organized Files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add app/src/main/assets/geleta-tts-data/
+          git commit -m "Organized voice files from zip" || echo "No changes to commit"
+          git push
