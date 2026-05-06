@@ -24,33 +24,21 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: true  # ስህተት የሚፈጥረውን ካሽ ያጠፋል
 
-      - name: Extract Voice Data and Organize
+      - name: Extract Voice Data
         run: |
           if [ -f "lang.zip" ]; then
             unzip -o lang.zip -d temp_lang/
             mkdir -p app/src/main/assets/geleta-tts-data/
             find temp_lang/ -type f -exec cp {} app/src/main/assets/geleta-tts-data/ \;
-            rm lang.zip
-            rm -rf temp_lang/
+            echo "ፋይሎች ተገልብጠዋል።"
           else
-            echo "lang.zip አልተገኘም፣ ወደ ቀጣዩ ስራ ያልፋል..."
+            echo "ማሳሰቢያ: lang.zip አልተገኘም!"
           fi
 
-      - name: Commit Organized Files
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add app/src/main/assets/geleta-tts-data/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Organized voice files from zip" && git push) || true
-
-      - name: Build with Gradle
+      - name: Build APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GeletaTTS-App
-          path: app/build/outputs/apk/debug/app-debug.apk
+          ./gradlew assembleDebug --stacktrace
