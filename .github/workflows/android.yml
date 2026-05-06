@@ -29,32 +29,30 @@ jobs:
 
       - name: Extract and Flatten Zip
         run: |
-          if [ -f "lang.zip" ]; then
-            echo "ዚፕ ፋይሉ ተገኝቷል፣ መፍታት እየተጀመረ ነው..."
-            unzip -o lang.zip -d temp_lang/
-            mkdir -p app/src/main/assets/geleta-tts-data/
-            
-            # ሁሉንም ፋይሎች ከውስጥ ፎልደሮች አውጥቶ ወደ አንድ ቦታ መገልበጥ
-            echo "ፋይሎችን እየበረበርኩ ነው..."
-            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            
-            echo "የተገለበጡ ፋይሎች ዝርዝር፦"
-            ls app/src/main/assets/geleta-tts-data/
-            
-            rm lang.zip
-            rm -rf temp_lang/
+          # ዚፕ ፋይሉ ያለበትን ትክክለኛ ቦታ መፈለግ
+          if [ -f "geleta-tts-data/lang.zip" ]; then
+            ZIP_FILE="geleta-tts-data/lang.zip"
+          elif [ -f "lang.zip" ]; then
+            ZIP_FILE="lang.zip"
           else
-            echo "ስህተት: lang.zip ፋይል በዋናው ገጽ ላይ አልተገኘም!"
+            echo "ስህተት: lang.zip ፋይል አልተገኘም!"
             exit 1
           fi
 
-      - name: Commit Changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add app/src/main/assets/geleta-tts-data/
-          git commit -m "Organized voice files" || echo "ምንም የሚቀየር ፋይል የለም"
-          git push || echo "Push ማድረግ አልተቻለም"
+          echo "$ZIP_FILE ተገኝቷል፣ መፍታት እየተጀመረ ነው..."
+          unzip -o "$ZIP_FILE" -d temp_lang/
+          mkdir -p app/src/main/assets/geleta-tts-data/
+          
+          # ከዚፑ የወጡ ፋይሎችን ወደ አሴትስ መገልበጥ
+          find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+          
+          # በ ፎልደሩ ውስጥ የነበሩ ሌሎች ፋይሎችንም (am_dict ወዘተ) መገልበጥ
+          if [ -d "geleta-tts-data" ]; then
+            find geleta-tts-data/ -type f ! -name "*.zip" -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+          fi
+
+          rm -rf temp_lang/
+          echo "ፋይሎች በተሳካ ሁኔታ ተደራጅተዋል።"
 
       - name: Build APK
         run: |
