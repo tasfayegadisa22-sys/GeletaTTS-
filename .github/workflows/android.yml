@@ -27,16 +27,29 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Fix Folder Structure and Organize Files
+      - name: Force Fix Project Structure
         run: |
-          # 1. ፋይሎቹ GeletaTTS- በሚል የተደራረበ ፎልደር ውስጥ ከሆኑ አውጥቶ ዋናው ገጽ ላይ ያደርጋቸዋል
-          if [ -d "GeletaTTS-" ]; then
-            echo "የተደራረበ ፎልደር ተገኝቷል። ፋይሎቹን ወደ ውጭ በማውጣት ላይ..."
-            mv GeletaTTS-/* . 2>/dev/null || true
-            mv GeletaTTS-/.* . 2>/dev/null || true
+          echo "--- የፋይል አደራደርን በማስተካከል ላይ ---"
+          
+          # 1. ማኒፌስቱን መፈለግ
+          MANIFEST=$(find . -name "AndroidManifest.xml" | grep -v "build" | head -n 1)
+          
+          if [ -z "$MANIFEST" ]; then
+            echo "ትልቅ ስህተት: AndroidManifest.xml በጊትሃብህ ላይ ጨርሶ አልተጫነም! እባክህ ፋይሉን ወደ ጊትሃብ አፕሎድ አድርግ።"
+            exit 1
+          fi
+          
+          echo "ማኒፌስቱ እዚህ ተገኝቷል: $MANIFEST"
+          MAIN_DIR=$(dirname "$MANIFEST")
+          
+          # 2. ፋይሎቹ ትክክለኛ ቦታ (app/src/main) ላይ ካልሆኑ በግድ ወደዛ መውሰድ
+          if [[ "$MAIN_DIR" != *"app/src/main"* ]]; then
+            echo "ፋይሎቹን ወደ ትክክለኛው ማውጫ (app/src/main) በማዛወር ላይ..."
+            mkdir -p app/src/main
+            cp -r "$MAIN_DIR"/* app/src/main/ 2>/dev/null || true
           fi
 
-          # 2. ዚፕ ፋይሉን ፈልጎ መፍታት እና ማደራጀት
+          # 3. lang.zip ፋይልን መፍታት
           ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
           if [ -n "$ZIP_PATH" ]; then
             unzip -o "$ZIP_PATH" -d temp_lang/
@@ -47,7 +60,7 @@ jobs:
 
       - name: Build APK
         run: |
-          # gradlew ፋይል ያለበትን ፈልጎ ወደ ዋናው ገጽ ማምጣት
+          # gradlew ፈልጎ ማምጣት ወይም መፍጠር
           GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
           if [ -n "$GRADLEW_PATH" ]; then
             cp "$GRADLEW_PATH" ./gradlew
