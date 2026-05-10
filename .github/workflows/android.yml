@@ -1,78 +1,20 @@
-name: Build GeletaTTS APK
+name: List Project Files
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  diagnose:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle 8.4
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.4
-
-      - name: Force Fix Project Structure
+      - name: 🔎 List All Files
         run: |
-          echo "--- የፋይል አደራደርን በማስተካከል ላይ ---"
-          
-          # 1. ማኒፌስቱን መፈለግ
-          MANIFEST=$(find . -name "AndroidManifest.xml" | grep -v "build" | head -n 1)
-          
-          if [ -z "$MANIFEST" ]; then
-            echo "ትልቅ ስህተት: AndroidManifest.xml በጊትሃብህ ላይ ጨርሶ አልተጫነም! እባክህ ፋይሉን ወደ ጊትሃብ አፕሎድ አድርግ።"
-            exit 1
-          fi
-          
-          echo "ማኒፌስቱ እዚህ ተገኝቷል: $MANIFEST"
-          MAIN_DIR=$(dirname "$MANIFEST")
-          
-          # 2. ፋይሎቹ ትክክለኛ ቦታ (app/src/main) ላይ ካልሆኑ በግድ ወደዛ መውሰድ
-          if [[ "$MAIN_DIR" != *"app/src/main"* ]]; then
-            echo "ፋይሎቹን ወደ ትክክለኛው ማውጫ (app/src/main) በማዛወር ላይ..."
-            mkdir -p app/src/main
-            cp -r "$MAIN_DIR"/* app/src/main/ 2>/dev/null || true
-          fi
-
-          # 3. lang.zip ፋይልን መፍታት
-          ZIP_PATH=$(find . -iname "lang.zip" | head -n 1)
-          if [ -n "$ZIP_PATH" ]; then
-            unzip -o "$ZIP_PATH" -d temp_lang/
-            mkdir -p app/src/main/assets/geleta-tts-data/
-            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            rm -rf temp_lang/
-          fi
-
-      - name: Build APK
-        run: |
-          # gradlew ፈልጎ ማምጣት ወይም መፍጠር
-          GRADLEW_PATH=$(find . -name "gradlew" | head -n 1)
-          if [ -n "$GRADLEW_PATH" ]; then
-            cp "$GRADLEW_PATH" ./gradlew
-          else
-            gradle wrapper --gradle-version 8.4
-          fi
-          
-          chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GeletaTTS-App
-          path: "**/build/outputs/apk/debug/*.apk"
+          echo "--- የፕሮጀክትህ ፋይሎች ዝርዝር ---"
+          find . -not -path '*/\.git/*' -type f | sort
+          echo "-------------------------------"
