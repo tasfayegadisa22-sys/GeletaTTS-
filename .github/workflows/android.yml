@@ -30,21 +30,13 @@ jobs:
       - name: Fix Hidden Manifest and Files
         run: |
           echo "--- የተደበቁ ፋይሎችን በማስተካከል ላይ ---"
-          
-          # የተደበቀውን ማኒፌስት ወደ ትክክለኛው ቦታ ማውጣት
           if [ -f "./app/app/src/main/AndroidManifest.xml" ]; then
-            echo "ማኒፌስቱ app/app ውስጥ ተገኝቷል! ወደ ትክክለኛው ቦታ እየወሰድኩት ነው..."
             cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
           fi
-          
-          # የተደበቀውን አኒካ ሮቦት ድምጽ (Line 162) ማስተካከል
           if [ -d "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" ]; then
-            echo "የአኒካ ሮቦት ድምጽን ወደ ትክክለኛው የ assets ፎልደር እየወሰድኩ ነው..."
             mkdir -p ./app/src/main/assets/voices/
             mv "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" "./app/src/main/assets/voices/" || true
           fi
-
-          # lang.zip መፍታት
           if [ -f "./lang.zip" ]; then
             unzip -o "./lang.zip" -d temp_lang/
             mkdir -p app/src/main/assets/geleta-tts-data/
@@ -52,13 +44,27 @@ jobs:
             rm -rf temp_lang/
           fi
 
+      - name: Fix AndroidX and Dependencies
+        run: |
+          echo "--- የጃቫ ኮድ ጥገኞችን (Dependencies) በማስተካከል ላይ ---"
+          
+          # AndroidX መብራቱን ማረጋገጥ
+          echo "android.useAndroidX=true" > gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          
+          # አስፈላጊዎቹን ላይብረሪዎች ወደ build.gradle መጨመር
+          if ! grep -q "androidx.appcompat:appcompat" app/build.gradle; then
+            echo "" >> app/build.gradle
+            echo "dependencies {" >> app/build.gradle
+            echo "    implementation 'androidx.appcompat:appcompat:1.6.1'" >> app/build.gradle
+            echo "    implementation 'com.google.android.material:material:1.10.0'" >> app/build.gradle
+            echo "}" >> app/build.gradle
+          fi
+
       - name: Build APK
         run: |
-          # gradlew ፋይል ስለሌለህ አዲስ እንፈጥራለን
           gradle wrapper --gradle-version 8.4
           chmod +x ./gradlew
-          
-          # አፑን መገንባት
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
