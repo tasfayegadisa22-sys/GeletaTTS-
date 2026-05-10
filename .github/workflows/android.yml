@@ -1,20 +1,68 @@
-name: List Project Files
+name: Build GeletaTTS APK
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  diagnose:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔎 List All Files
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle 8.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.4
+
+      - name: Fix Hidden Manifest and Files
         run: |
-          echo "--- የፕሮጀክትህ ፋይሎች ዝርዝር ---"
-          find . -not -path '*/\.git/*' -type f | sort
-          echo "-------------------------------"
+          echo "--- የተደበቁ ፋይሎችን በማስተካከል ላይ ---"
+          
+          # የተደበቀውን ማኒፌስት ወደ ትክክለኛው ቦታ ማውጣት
+          if [ -f "./app/app/src/main/AndroidManifest.xml" ]; then
+            echo "ማኒፌስቱ app/app ውስጥ ተገኝቷል! ወደ ትክክለኛው ቦታ እየወሰድኩት ነው..."
+            cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
+          fi
+          
+          # የተደበቀውን አኒካ ሮቦት ድምጽ (Line 162) ማስተካከል
+          if [ -d "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" ]; then
+            echo "የአኒካ ሮቦት ድምጽን ወደ ትክክለኛው የ assets ፎልደር እየወሰድኩ ነው..."
+            mkdir -p ./app/src/main/assets/voices/
+            mv "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" "./app/src/main/assets/voices/" || true
+          fi
+
+          # lang.zip መፍታት
+          if [ -f "./lang.zip" ]; then
+            unzip -o "./lang.zip" -d temp_lang/
+            mkdir -p app/src/main/assets/geleta-tts-data/
+            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            rm -rf temp_lang/
+          fi
+
+      - name: Build APK
+        run: |
+          # gradlew ፋይል ስለሌለህ አዲስ እንፈጥራለን
+          gradle wrapper --gradle-version 8.4
+          chmod +x ./gradlew
+          
+          # አፑን መገንባት
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeletaTTS-App
+          path: "**/build/outputs/apk/debug/*.apk"
