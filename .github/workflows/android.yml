@@ -24,28 +24,40 @@ jobs:
 
       - name: Fix Project Structure and Dependencies
         run: |
-          echo "--- ፕሮጀክቱን ወደ API 34 በማሳደግ ላይ ---"
+          echo "--- የፕሮጀክት ፋይሎችን በሙሉ በማስተካከል ላይ ---"
           
-          # 1. አስፈላጊ የሆኑ ማህደሮችን መፍጠር
+          # 1. አድራሻዎችን ማስተካከል
           mkdir -p app/src/main/
           if [ -f "./app/app/src/main/AndroidManifest.xml" ]; then
             cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
           fi
 
-          # 2. የድምጽ ፋይሎችን ማስተካከል
-          if [ -d "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" ]; then
-            mkdir -p ./app/src/main/assets/voices/
-            mv "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" "./app/src/main/assets/voices/" || true
-          fi
+          # 2. settings.gradle ፋይልን ማስተካከል (የመጣውን ስህተት የሚፈታው ይሄ ነው)
+          cat <<EOF > settings.gradle
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "GeletaTTS"
+          include ':app'
+          EOF
 
-          # 3. ዋናውን build.gradle ማስተካከል (Plugin ስሪቱን ወደ 8.1.1 ከፍ አድርገነዋል)
+          # 3. ዋናውን build.gradle ማስተካከል (repositories እዚህ አያስፈልጉም)
           cat <<EOF > build.gradle
           buildscript {
-              repositories { google(); mavenCentral() }
-              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
-          }
-          allprojects {
-              repositories { google(); mavenCentral() }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.1.1'
+              }
           }
           EOF
 
@@ -85,14 +97,6 @@ jobs:
           # 5. የ AndroidX ቅንብሮችን ማረጋገጥ
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
-
-          # 6. የቋንቋ ፋይሎችን መፍታት
-          if [ -f "./lang.zip" ]; then
-            unzip -o "./lang.zip" -d temp_lang/
-            mkdir -p app/src/main/assets/geleta-tts-data/
-            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            rm -rf temp_lang/
-          fi
 
       - name: Build APK
         run: |
