@@ -27,28 +27,35 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Fix Project Structure and Source Code
+      - name: Force Standard Project Structure
         run: |
-          echo "--- የጃቫ ኮድ እና የፋይል አቀማመጥን ማስተካከል ---"
+          echo "--- ፋይሎችን ወደ ትክክለኛ ቦታ በማዛወር ላይ ---"
           
-          # 1. ንጹህ የፋይል መዋቅር መፍጠር
-          mkdir -p app/src/main/java
-          mkdir -p app/src/main/res
-          mkdir -p app/src/main/assets
+          # 1. ንጹህ መዋቅር መፍጠር
+          mkdir -p staging/app/src/main/java
+          mkdir -p staging/app/src/main/res
+          mkdir -p staging/app/src/main/assets
 
-          # 2. የጃቫ ፋይሎችን ፈልጎ ወደ ትክክለኛው ቦታ ማምጣት
-          # በስህተት ተደራርበው ከሆነ ወይም በሌላ ቦታ ካሉ ሰብስቦ ያመጣቸዋል
-          find . -name "*.java" -path "*/src/main/java/*" -exec cp -r --parents {} app/src/main/java/ \; || true
-          
-          # 3. ማኒፌስት እና ሪሶርስ ፋይሎችን ማስተካከል
-          find . -name "AndroidManifest.xml" -exec cp {} app/src/main/AndroidManifest.xml \; -quit || true
-          find . -name "res" -type d -path "*/src/main/*" -exec cp -r {}/.. app/src/main/ \; || true
+          # 2. የጃቫ ኮዶችን ፈልጎ ማውጣት (ከየትኛውም ቦታ)
+          find . -name "*.java" ! -path "*/staging/*" | while read file; do
+            pkg_path=$(grep -m 1 "^package " "$file" | sed 's/package //' | sed 's/;//' | tr '.' '/')
+            mkdir -p "staging/app/src/main/java/$pkg_path"
+            cp "$file" "staging/app/src/main/java/$pkg_path/"
+          done
 
-          # 4. settings.gradle
+          # 3. ማኒፌስት እና ሪሶርስ ፋይሎችን መፈለግ
+          find . -name "AndroidManifest.xml" ! -path "*/staging/*" -exec cp {} staging/app/src/main/AndroidManifest.xml \; -quit || true
+          find . -name "res" -type d ! -path "*/staging/*" -exec cp -r {}/* staging/app/src/main/res/ \; || true
+          find . -name "assets" -type d ! -path "*/staging/*" -exec cp -r {}/* staging/app/src/main/assets/ \; || true
+
+          # 4. የድሮ ፋይሎችን አጽድቶ በአዲሱ መተካት
+          rm -rf app build.gradle settings.gradle gradle.properties
+          mv staging/* .
+          rm -rf staging
+
+          # 5. ትክክለኛ የ settings.gradle ፋይል መፍጠር
           cat <<EOF > settings.gradle
-          pluginManagement {
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
-          }
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
               repositories { google(); mavenCentral() }
@@ -57,18 +64,14 @@ jobs:
           include ':app'
           EOF
 
-          # 5. build.gradle (Root)
+          # 6. ዋናው build.gradle
           cat <<EOF > build.gradle
-          plugins {
-              id 'com.android.application' version '8.1.1' apply false
-          }
+          plugins { id 'com.android.application' version '8.1.1' apply false }
           EOF
 
-          # 6. app/build.gradle
+          # 7. የ app/build.gradle ፋይል
           cat <<EOF > app/build.gradle
-          plugins {
-              id 'com.android.application'
-          }
+          plugins { id 'com.android.application' }
           android {
               namespace 'com.geleta.tts'
               compileSdk 34
@@ -91,13 +94,13 @@ jobs:
           }
           EOF
 
-          # 7. gradle.properties
+          # 8. gradle.properties
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
       - name: Build APK
         run: |
-          # ኮዱን እንዲያጠናቅረው እናዝዘዋለን
+          chmod +x gradlew || true
           gradle assembleDebug --stacktrace
 
       - name: Upload APK
