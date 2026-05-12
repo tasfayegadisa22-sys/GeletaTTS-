@@ -22,9 +22,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # ጊትሃብ የ Gradle 8.4 ስሪትን ብቻ እንዲጠቀም መገደብ
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.4
+
       - name: Fix Project Structure and Dependencies
         run: |
-          echo "--- የፕሮጀክት ማዋቀሪያ ፋይሎችን በድጋሚ በማስተካከል ላይ ---"
+          echo "--- የፕሮጀክት ፋይሎችን በማስተካከል ላይ ---"
           
           # 1. አድራሻዎችን ማስተካከል
           mkdir -p app/src/main/
@@ -32,7 +38,7 @@ jobs:
             cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
           fi
 
-          # 2. settings.gradle - ሁሉንም Repository እዚህ ጋር እናጠቃልላለን
+          # 2. settings.gradle
           cat <<EOF > settings.gradle
           pluginManagement {
               repositories {
@@ -52,14 +58,14 @@ jobs:
           include ':app'
           EOF
 
-          # 3. ዋናው build.gradle - እዚህ ጋር Plugin ብቻ ነው የምናውጀው
+          # 3. build.gradle (Root)
           cat <<EOF > build.gradle
           plugins {
               id 'com.android.application' version '8.1.1' apply false
           }
           EOF
 
-          # 4. የ app/build.gradle - ለአንድሮይድ 14 (API 34) የተስተካከለ
+          # 4. app/build.gradle
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
@@ -73,11 +79,6 @@ jobs:
                   targetSdk 34
                   versionCode 1
                   versionName "1.0"
-              }
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                  }
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -98,11 +99,8 @@ jobs:
 
       - name: Build APK
         run: |
-          # Gradle Wrapper መፍጠር
-          gradle wrapper --gradle-version 8.4
-          chmod +x ./gradlew
-          # አፑን መገንባት
-          ./gradlew assembleDebug --stacktrace
+          # እዚህ ጋር 'gradle' የሚለው ትዕዛዝ በደረጃ 8.4 መሰረት ይሰራል
+          gradle assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
