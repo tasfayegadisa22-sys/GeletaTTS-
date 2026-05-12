@@ -22,43 +22,76 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle 8.4
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.4
-
-      - name: Fix Hidden Manifest and Files
+      - name: Fix Project Structure and Dependencies
         run: |
-          echo "--- የተደበቁ ፋይሎችን በማስተካከል ላይ ---"
+          echo "--- ፕሮጀክቱን ወደ API 34 በማሳደግ ላይ ---"
+          
+          # 1. አስፈላጊ የሆኑ ማህደሮችን መፍጠር
+          mkdir -p app/src/main/
           if [ -f "./app/app/src/main/AndroidManifest.xml" ]; then
             cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
           fi
+
+          # 2. የድምጽ ፋይሎችን ማስተካከል
           if [ -d "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" ]; then
             mkdir -p ./app/src/main/assets/voices/
             mv "./app/src/main/java/com/geleta/tts/app/src/main/assets/anikaRobot" "./app/src/main/assets/voices/" || true
           fi
+
+          # 3. ዋናውን build.gradle ማስተካከል (Plugin ስሪቱን ወደ 8.1.1 ከፍ አድርገነዋል)
+          cat <<EOF > build.gradle
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.1' }
+          }
+          allprojects {
+              repositories { google(); mavenCentral() }
+          }
+          EOF
+
+          # 4. የ app/build.gradle ፋይልን ለ API 34 ማስተካከል
+          cat <<EOF > app/build.gradle
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.geleta.tts'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.geleta.tts"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.10.0'
+              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+              implementation 'androidx.activity:activity:1.8.0'
+          }
+          EOF
+
+          # 5. የ AndroidX ቅንብሮችን ማረጋገጥ
+          echo "android.useAndroidX=true" > gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+
+          # 6. የቋንቋ ፋይሎችን መፍታት
           if [ -f "./lang.zip" ]; then
             unzip -o "./lang.zip" -d temp_lang/
             mkdir -p app/src/main/assets/geleta-tts-data/
             find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
             rm -rf temp_lang/
-          fi
-
-      - name: Fix AndroidX and Dependencies
-        run: |
-          echo "--- የጃቫ ኮድ ጥገኞችን (Dependencies) በማስተካከል ላይ ---"
-          
-          # AndroidX መብራቱን ማረጋገጥ
-          echo "android.useAndroidX=true" > gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-          
-          # አስፈላጊዎቹን ላይብረሪዎች ወደ build.gradle መጨመር
-          if ! grep -q "androidx.appcompat:appcompat" app/build.gradle; then
-            echo "" >> app/build.gradle
-            echo "dependencies {" >> app/build.gradle
-            echo "    implementation 'androidx.appcompat:appcompat:1.6.1'" >> app/build.gradle
-            echo "    implementation 'com.google.android.material:material:1.10.0'" >> app/build.gradle
-            echo "}" >> app/build.gradle
           fi
 
       - name: Build APK
@@ -71,4 +104,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: GeletaTTS-App
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: "app/build/outputs/apk/debug/*.apk"
