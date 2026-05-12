@@ -22,50 +22,49 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # ጊትሃብ የ Gradle 8.4 ስሪትን ብቻ እንዲጠቀም መገደብ
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.4
 
-      - name: Fix Project Structure and Dependencies
+      - name: Fix Project Structure and Source Code
         run: |
-          echo "--- የፕሮጀክት ፋይሎችን በማስተካከል ላይ ---"
+          echo "--- የጃቫ ኮድ እና የፋይል አቀማመጥን ማስተካከል ---"
           
-          # 1. አድራሻዎችን ማስተካከል
-          mkdir -p app/src/main/
-          if [ -f "./app/app/src/main/AndroidManifest.xml" ]; then
-            cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
-          fi
+          # 1. ንጹህ የፋይል መዋቅር መፍጠር
+          mkdir -p app/src/main/java
+          mkdir -p app/src/main/res
+          mkdir -p app/src/main/assets
 
-          # 2. settings.gradle
+          # 2. የጃቫ ፋይሎችን ፈልጎ ወደ ትክክለኛው ቦታ ማምጣት
+          # በስህተት ተደራርበው ከሆነ ወይም በሌላ ቦታ ካሉ ሰብስቦ ያመጣቸዋል
+          find . -name "*.java" -path "*/src/main/java/*" -exec cp -r --parents {} app/src/main/java/ \; || true
+          
+          # 3. ማኒፌስት እና ሪሶርስ ፋይሎችን ማስተካከል
+          find . -name "AndroidManifest.xml" -exec cp {} app/src/main/AndroidManifest.xml \; -quit || true
+          find . -name "res" -type d -path "*/src/main/*" -exec cp -r {}/.. app/src/main/ \; || true
+
+          # 4. settings.gradle
           cat <<EOF > settings.gradle
           pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
           }
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
+              repositories { google(); mavenCentral() }
           }
           rootProject.name = "GeletaTTS"
           include ':app'
           EOF
 
-          # 3. build.gradle (Root)
+          # 5. build.gradle (Root)
           cat <<EOF > build.gradle
           plugins {
               id 'com.android.application' version '8.1.1' apply false
           }
           EOF
 
-          # 4. app/build.gradle
+          # 6. app/build.gradle
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
@@ -89,17 +88,16 @@ jobs:
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.10.0'
               implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-              implementation 'androidx.activity:activity:1.8.0'
           }
           EOF
 
-          # 5. gradle.properties
+          # 7. gradle.properties
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
       - name: Build APK
         run: |
-          # እዚህ ጋር 'gradle' የሚለው ትዕዛዝ በደረጃ 8.4 መሰረት ይሰራል
+          # ኮዱን እንዲያጠናቅረው እናዝዘዋለን
           gradle assembleDebug --stacktrace
 
       - name: Upload APK
