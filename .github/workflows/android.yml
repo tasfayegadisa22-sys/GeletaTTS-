@@ -27,33 +27,84 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Force Standard Project Structure
+      - name: Force Reconstruction of Project
         run: |
-          echo "--- ፋይሎችን ወደ ትክክለኛ ቦታ በማዛወር ላይ ---"
+          echo "--- ፕሮጀክቱን ከዜሮ በትክክል በመገንባት ላይ ---"
           
-          # 1. ንጹህ መዋቅር መፍጠር
-          mkdir -p staging/app/src/main/java
-          mkdir -p staging/app/src/main/res
-          mkdir -p staging/app/src/main/assets
+          # 1. አሮጌ እና የተዘበራረቁ ፎልደሮችን ማጽዳት
+          rm -rf app
+          mkdir -p app/src/main/java/com/geleta/tts
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/assets/geleta-tts-data
 
-          # 2. የጃቫ ኮዶችን ፈልጎ ማውጣት (ከየትኛውም ቦታ)
-          find . -name "*.java" ! -path "*/staging/*" | while read file; do
-            pkg_path=$(grep -m 1 "^package " "$file" | sed 's/package //' | sed 's/;//' | tr '.' '/')
-            mkdir -p "staging/app/src/main/java/$pkg_path"
-            cp "$file" "staging/app/src/main/java/$pkg_path/"
-          done
+          # 2. የሚሰራ AndroidManifest.xml መፍጠር
+          cat <<EOF > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="GeletaTTS"
+                  android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".GeletaTtsService"
+                      android:label="Geleta TTS Engine"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_TTS_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.intent.action.TTS_SERVICE" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.speech.tts"
+                          android:resource="@xml/tts_engine" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
 
-          # 3. ማኒፌስት እና ሪሶርስ ፋይሎችን መፈለግ
-          find . -name "AndroidManifest.xml" ! -path "*/staging/*" -exec cp {} staging/app/src/main/AndroidManifest.xml \; -quit || true
-          find . -name "res" -type d ! -path "*/staging/*" -exec cp -r {}/* staging/app/src/main/res/ \; || true
-          find . -name "assets" -type d ! -path "*/staging/*" -exec cp -r {}/* staging/app/src/main/assets/ \; || true
+          # 3. አዲስ እና ንጹህ MainActivity.java መጻፍ (ግጭቶችን ለማስወገድ)
+          cat <<EOF > app/src/main/java/com/geleta/tts/MainActivity.java
+          package com.geleta.tts;
+          import android.os.Bundle;
+          import androidx.appcompat.app.AppCompatActivity;
+          import android.widget.TextView;
 
-          # 4. የድሮ ፋይሎችን አጽድቶ በአዲሱ መተካት
-          rm -rf app build.gradle settings.gradle gradle.properties
-          mv staging/* .
-          rm -rf staging
+          public class MainActivity extends AppCompatActivity {
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  TextView tv = new TextView(this);
+                  tv.setText("GeletaTTS ዝግጁ ነው!");
+                  tv.setTextSize(24);
+                  setContentView(tv);
+              }
+          }
+          EOF
 
-          # 5. ትክክለኛ የ settings.gradle ፋይል መፍጠር
+          # 4. አስፈላጊ የሆኑ የሪሶርስ ፋይሎችን መፍጠር
+          echo '<resources><style name="Theme.GeletaTTS" parent="Theme.AppCompat.Light.DarkActionBar" /></resources>' > app/src/main/res/values/themes.xml
+          echo '<resources><string name="app_name">GeletaTTS</string></resources>' > app/src/main/res/values/strings.xml
+          echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
+
+          # 5. የቋንቋ ፋይሎችን መፍታት
+          if [ -f "./lang.zip" ]; then
+            unzip -o "./lang.zip" -d temp_lang/
+            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
+            rm -rf temp_lang/
+          fi
+
+          # 6. የGradle ማዋቀሪያ ፋይሎችን መፍጠር
           cat <<EOF > settings.gradle
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement {
@@ -64,12 +115,10 @@ jobs:
           include ':app'
           EOF
 
-          # 6. ዋናው build.gradle
           cat <<EOF > build.gradle
           plugins { id 'com.android.application' version '8.1.1' apply false }
           EOF
 
-          # 7. የ app/build.gradle ፋይል
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application' }
           android {
@@ -82,25 +131,18 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
               implementation 'com.google.android.material:material:1.10.0'
-              implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
           }
           EOF
 
-          # 8. gradle.properties
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
       - name: Build APK
         run: |
-          chmod +x gradlew || true
           gradle assembleDebug --stacktrace
 
       - name: Upload APK
