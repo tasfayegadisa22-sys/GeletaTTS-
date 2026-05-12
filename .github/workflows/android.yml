@@ -24,7 +24,7 @@ jobs:
 
       - name: Fix Project Structure and Dependencies
         run: |
-          echo "--- የፕሮጀክት ፋይሎችን በሙሉ በማስተካከል ላይ ---"
+          echo "--- የፕሮጀክት ማዋቀሪያ ፋይሎችን በድጋሚ በማስተካከል ላይ ---"
           
           # 1. አድራሻዎችን ማስተካከል
           mkdir -p app/src/main/
@@ -32,7 +32,7 @@ jobs:
             cp "./app/app/src/main/AndroidManifest.xml" "./app/src/main/AndroidManifest.xml"
           fi
 
-          # 2. settings.gradle ፋይልን ማስተካከል (የመጣውን ስህተት የሚፈታው ይሄ ነው)
+          # 2. settings.gradle - ሁሉንም Repository እዚህ ጋር እናጠቃልላለን
           cat <<EOF > settings.gradle
           pluginManagement {
               repositories {
@@ -52,16 +52,14 @@ jobs:
           include ':app'
           EOF
 
-          # 3. ዋናውን build.gradle ማስተካከል (repositories እዚህ አያስፈልጉም)
+          # 3. ዋናው build.gradle - እዚህ ጋር Plugin ብቻ ነው የምናውጀው
           cat <<EOF > build.gradle
-          buildscript {
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.1'
-              }
+          plugins {
+              id 'com.android.application' version '8.1.1' apply false
           }
           EOF
 
-          # 4. የ app/build.gradle ፋይልን ለ API 34 ማስተካከል
+          # 4. የ app/build.gradle - ለአንድሮይድ 14 (API 34) የተስተካከለ
           cat <<EOF > app/build.gradle
           plugins {
               id 'com.android.application'
@@ -94,14 +92,16 @@ jobs:
           }
           EOF
 
-          # 5. የ AndroidX ቅንብሮችን ማረጋገጥ
+          # 5. gradle.properties
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
       - name: Build APK
         run: |
+          # Gradle Wrapper መፍጠር
           gradle wrapper --gradle-version 8.4
           chmod +x ./gradlew
+          # አፑን መገንባት
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
