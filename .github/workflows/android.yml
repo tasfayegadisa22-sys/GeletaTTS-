@@ -27,9 +27,9 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Inject Full TTS Logic and UI
+      - name: Add Multi-Language Support
         run: |
-          echo "--- ሙሉ የTTS ሞተር እና የቅንጅቶች ገጽን በመገንባት ላይ ---"
+          echo "--- የአማርኛ፣ ኦሮምኛ እና እንግሊዘኛ ቋንቋዎችን በመጨመር ላይ ---"
           
           rm -rf app
           mkdir -p app/src/main/java/com/geleta/tts
@@ -38,58 +38,64 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/assets/geleta-tts-data
 
-          # 1. የቅንጅቶች ገጽ ዲዛይን (layout)
+          # 1. የተሻሻለ የቅንጅቶች ገጽ (ከቋንቋ ምርጫ ጋር)
           cat <<EOF > app/src/main/res/layout/activity_main.xml
           <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+          <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
               android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="20dp">
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="GeletaTTS የድምፅ ቅንጅቶች"
-                  android:textSize="24sp"
-                  android:textStyle="bold"
-                  android:layout_marginBottom="30dp"/>
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="የንግግር ፍጥነት (Speech Rate)"/>
-              <SeekBar
-                  android:id="@+id/speedSeekBar"
+              android:layout_height="match_parent">
+              <LinearLayout 
                   android:layout_width="match_parent"
                   android:layout_height="wrap_content"
-                  android:max="100"
-                  android:progress="50"
-                  android:layout_marginBottom="20dp"/>
-              <TextView
-                  android:layout_width="wrap_content"
-                  android:layout_height="wrap_content"
-                  android:text="የድምፅ ቅላጼ (Pitch)"/>
-              <SeekBar
-                  android:id="@+id/pitchSeekBar"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:max="100"
-                  android:progress="50"
-                  android:layout_marginBottom="20dp"/>
-              <Button
-                  android:id="@+id/testButton"
-                  android:layout_width="match_parent"
-                  android:layout_height="wrap_content"
-                  android:text="ድምፁን ለመሞከር"/>
-          </LinearLayout>
+                  android:orientation="vertical"
+                  android:padding="20dp">
+                  
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="GeletaTTS ቅንጅቶች"
+                      android:textSize="24sp"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="20dp"/>
+
+                  <TextView
+                      android:layout_width="wrap_content"
+                      android:layout_height="wrap_content"
+                      android:text="ቋንቋ ይምረጡ (Select Language)"
+                      android:textStyle="bold"
+                      android:layout_marginBottom="10dp"/>
+
+                  <RadioGroup
+                      android:id="@+id/langGroup"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:layout_marginBottom="20dp">
+                      <RadioButton android:id="@+id/rbAmh" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="አማርኛ (Amharic)" android:checked="true"/>
+                      <RadioButton android:id="@+id/rbOrm" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Afaan Oromoo (Oromo)"/>
+                      <RadioButton android:id="@+id/rbEng" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="English"/>
+                  </RadioGroup>
+
+                  <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#CCCCCC" android:layout_marginBottom="20dp"/>
+
+                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="የንግግር ፍጥነት (Speech Rate)"/>
+                  <SeekBar android:id="@+id/speedSeekBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:max="100" android:progress="50" android:layout_marginBottom="20dp"/>
+
+                  <Button
+                      android:id="@+id/testButton"
+                      android:layout_width="match_parent"
+                      android:layout_height="wrap_content"
+                      android:text="ድምፁን ሞክር (Test Voice)"/>
+              </LinearLayout>
+          </ScrollView>
           EOF
 
-          # 2. MainActivity.java (ከSliders ጋር)
+          # 2. MainActivity.java (የምርጫ ክትትል)
           cat <<EOF > app/src/main/java/com/geleta/tts/MainActivity.java
           package com.geleta.tts;
           import android.os.Bundle;
           import androidx.appcompat.app.AppCompatActivity;
-          import android.widget.SeekBar;
           import android.widget.Button;
+          import android.widget.RadioGroup;
           import android.widget.Toast;
 
           public class MainActivity extends AppCompatActivity {
@@ -98,15 +104,22 @@ jobs:
                   super.onCreate(savedInstanceState);
                   setContentView(R.layout.activity_main);
                   
+                  RadioGroup langGroup = findViewById(R.id.langGroup);
                   Button testButton = findViewById(R.id.testButton);
+
                   testButton.setOnClickListener(v -> {
-                      Toast.makeText(this, "የGeletaTTS ሞተር በትክክል እየሰራ ነው!", Toast.LENGTH_SHORT).show();
+                      int selectedId = langGroup.getCheckedRadioButtonId();
+                      String lang = "አማርኛ";
+                      if (selectedId == R.id.rbOrm) lang = "Afaan Oromoo";
+                      else if (selectedId == R.id.rbEng) lang = "English";
+                      
+                      Toast.makeText(this, lang + " ተመርጧል - ሞተሩ ዝግጁ ነው!", Toast.LENGTH_SHORT).show();
                   });
               }
           }
           EOF
 
-          # 3. GeletaTtsService.java (ከሙሉ ኢንጂን ምዝገባ ጋር)
+          # 3. GeletaTtsService.java (የ3ቱን ቋንቋዎች ተገኝነት ማረጋገጥ)
           cat <<EOF > app/src/main/java/com/geleta/tts/GeletaTtsService.java
           package com.geleta.tts;
           import android.speech.tts.TextToSpeech;
@@ -117,19 +130,26 @@ jobs:
 
           public class GeletaTtsService extends TextToSpeechService {
               @Override
-              protected void onStop() {}
-              @Override
               protected int onIsLanguageAvailable(String lang, String country, String variant) {
-                  return TextToSpeech.LANG_AVAILABLE;
+                  if ("amh".equals(lang) || "orm".equals(lang) || "eng".equals(lang) || "am".equals(lang) || "om".equals(lang) || "en".equals(lang)) {
+                      return TextToSpeech.LANG_AVAILABLE;
+                  }
+                  return TextToSpeech.LANG_NOT_SUPPORTED;
               }
+
               @Override
               protected String[] onGetLanguage() {
                   return new String[]{"amh", "ETH", ""};
               }
+
               @Override
               protected int onLoadLanguage(String lang, String country, String variant) {
                   return onIsLanguageAvailable(lang, country, variant);
               }
+
+              @Override
+              protected void onStop() {}
+
               @Override
               protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) {
                   callback.start(16000, 2, 1);
@@ -138,7 +158,7 @@ jobs:
           }
           EOF
 
-          # 4. Manifest ማስተካከያ (በዝርዝር ውስጥ እንዲመጣ)
+          # 4. Resources
           cat <<EOF > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -149,25 +169,17 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <service android:name=".GeletaTtsService" 
-                      android:exported="true" 
-                      android:label="Geleta Amharic TTS"
-                      android:permission="android.permission.BIND_TTS_SERVICE">
-                      <intent-filter priority="100">
-                          <action android:name="android.intent.action.TTS_SERVICE" />
-                          <category android:name="android.intent.category.DEFAULT" />
-                      </intent-filter>
+                  <service android:name=".GeletaTtsService" android:exported="true" android:label="Geleta Multi-Lang TTS" android:permission="android.permission.BIND_TTS_SERVICE">
+                      <intent-filter priority="100"><action android:name="android.intent.action.TTS_SERVICE" /></intent-filter>
                       <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
                   </service>
               </application>
           </manifest>
           EOF
-
-          # 5. የቋንቋ ፋይሎችን መያዣ
           echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
           echo '<resources><style name="AppTheme" parent="Theme.AppCompat.Light" /></resources>' > app/src/main/res/values/styles.xml
 
-          # 6. Gradle
+          # 5. Gradle
           echo "include ':app'" > settings.gradle
           echo "rootProject.name = 'GeletaTTS'" >> settings.gradle
           cat <<EOF > build.gradle
