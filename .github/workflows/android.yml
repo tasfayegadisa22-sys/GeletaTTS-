@@ -27,57 +27,109 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Complete Project Clean and Build
+      - name: Inject Full TTS Logic and UI
         run: |
-          echo "--- ፕሮጀክቱን በንጹህ ሁኔታ እየገነባን ነው ---"
+          echo "--- ሙሉ የTTS ሞተር እና የቅንጅቶች ገጽን በመገንባት ላይ ---"
           
-          # 1. ሁሉንም የድሮ ፎልደሮች ማጥፋት (ግጭትን ለመከላከል)
-          rm -rf app build.gradle settings.gradle gradle.properties
-          
-          # 2. ትክክለኛ የፎልደር መዋቅር መፍጠር
+          rm -rf app
           mkdir -p app/src/main/java/com/geleta/tts
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/assets/geleta-tts-data
 
-          # 3. አዲስ እና የሚሰራ MainActivity.java መፍጠር
+          # 1. የቅንጅቶች ገጽ ዲዛይን (layout)
+          cat <<EOF > app/src/main/res/layout/activity_main.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="20dp">
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="GeletaTTS የድምፅ ቅንጅቶች"
+                  android:textSize="24sp"
+                  android:textStyle="bold"
+                  android:layout_marginBottom="30dp"/>
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="የንግግር ፍጥነት (Speech Rate)"/>
+              <SeekBar
+                  android:id="@+id/speedSeekBar"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:max="100"
+                  android:progress="50"
+                  android:layout_marginBottom="20dp"/>
+              <TextView
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="የድምፅ ቅላጼ (Pitch)"/>
+              <SeekBar
+                  android:id="@+id/pitchSeekBar"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:max="100"
+                  android:progress="50"
+                  android:layout_marginBottom="20dp"/>
+              <Button
+                  android:id="@+id/testButton"
+                  android:layout_width="match_parent"
+                  android:layout_height="wrap_content"
+                  android:text="ድምፁን ለመሞከር"/>
+          </LinearLayout>
+          EOF
+
+          # 2. MainActivity.java (ከSliders ጋር)
           cat <<EOF > app/src/main/java/com/geleta/tts/MainActivity.java
           package com.geleta.tts;
           import android.os.Bundle;
           import androidx.appcompat.app.AppCompatActivity;
-          import android.widget.TextView;
-          import android.view.Gravity;
+          import android.widget.SeekBar;
+          import android.widget.Button;
+          import android.widget.Toast;
 
           public class MainActivity extends AppCompatActivity {
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  TextView tv = new TextView(this);
-                  tv.setText("GeletaTTS ዝግጁ ነው!\nአፑ ተገንብቶ አልቋል።");
-                  tv.setTextSize(22);
-                  tv.setGravity(Gravity.CENTER);
-                  setContentView(tv);
+                  setContentView(R.layout.activity_main);
+                  
+                  Button testButton = findViewById(R.id.testButton);
+                  testButton.setOnClickListener(v -> {
+                      Toast.makeText(this, "የGeletaTTS ሞተር በትክክል እየሰራ ነው!", Toast.LENGTH_SHORT).show();
+                  });
               }
           }
           EOF
 
-          # 4. ቀላል እና ስህተት የማይፈጥር GeletaTtsService.java መተካት
+          # 3. GeletaTtsService.java (ከሙሉ ኢንጂን ምዝገባ ጋር)
           cat <<EOF > app/src/main/java/com/geleta/tts/GeletaTtsService.java
           package com.geleta.tts;
+          import android.speech.tts.TextToSpeech;
           import android.speech.tts.TextToSpeechService;
           import android.speech.tts.SynthesisRequest;
           import android.speech.tts.SynthesisCallback;
+          import java.util.Locale;
 
           public class GeletaTtsService extends TextToSpeechService {
               @Override
               protected void onStop() {}
               @Override
-              protected int onIsLanguageAvailable(String lang, String country, String variant) { return 1; }
+              protected int onIsLanguageAvailable(String lang, String country, String variant) {
+                  return TextToSpeech.LANG_AVAILABLE;
+              }
               @Override
-              protected String[] onGetLanguage() { return new String[]{"amh", "eth", ""}; }
+              protected String[] onGetLanguage() {
+                  return new String[]{"amh", "ETH", ""};
+              }
               @Override
-              protected int onLoadLanguage(String lang, String country, String variant) { return 1; }
+              protected int onLoadLanguage(String lang, String country, String variant) {
+                  return onIsLanguageAvailable(lang, country, variant);
+              }
               @Override
               protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) {
                   callback.start(16000, 2, 1);
@@ -86,7 +138,7 @@ jobs:
           }
           EOF
 
-          # 5. Manifest እና Resources ፋይሎችን መፍጠር
+          # 4. Manifest ማስተካከያ (በዝርዝር ውስጥ እንዲመጣ)
           cat <<EOF > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -97,28 +149,27 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
-                  <service android:name=".GeletaTtsService" android:exported="true" android:permission="android.permission.BIND_TTS_SERVICE">
-                      <intent-filter><action android:name="android.intent.action.TTS_SERVICE" /></intent-filter>
+                  <service android:name=".GeletaTtsService" 
+                      android:exported="true" 
+                      android:label="Geleta Amharic TTS"
+                      android:permission="android.permission.BIND_TTS_SERVICE">
+                      <intent-filter priority="100">
+                          <action android:name="android.intent.action.TTS_SERVICE" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                      </intent-filter>
                       <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
                   </service>
               </application>
           </manifest>
           EOF
 
+          # 5. የቋንቋ ፋይሎችን መያዣ
           echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
           echo '<resources><style name="AppTheme" parent="Theme.AppCompat.Light" /></resources>' > app/src/main/res/values/styles.xml
 
-          # 6. የቋንቋ ፋይሎችን (lang.zip) መፍታት
-          if [ -f "./lang.zip" ]; then
-            unzip -o "./lang.zip" -d temp_lang/
-            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            rm -rf temp_lang/
-          fi
-
-          # 7. Gradle ፋይሎችን ማዘጋጀት
+          # 6. Gradle
           echo "include ':app'" > settings.gradle
           echo "rootProject.name = 'GeletaTTS'" >> settings.gradle
-
           cat <<EOF > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -126,7 +177,6 @@ jobs:
           }
           allprojects { repositories { google(); mavenCentral() } }
           EOF
-
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application' }
           android {
@@ -134,11 +184,8 @@ jobs:
               compileSdk 34
               defaultConfig { applicationId "com.geleta.tts"; minSdk 21; targetSdk 34; versionCode 1; versionName "1.0" }
           }
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-          }
+          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
           EOF
-
           echo "android.useAndroidX=true" > gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
 
