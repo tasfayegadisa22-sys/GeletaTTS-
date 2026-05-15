@@ -27,194 +27,83 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Inject Copy, Share and Live TTS Tracker
+      - name: Integrate Engine and Data
         run: |
-          echo "--- ኮፒ/ሼር በተን እና Live TTS Tracker በመገንባት ላይ ---"
+          echo "--- ሞተሩን እና ዳታውን የማዋሃድ ስራ ---"
           
+          # 1. አዲሱን የአፕ ስም እና ፎልደር መፍጠር (Package Name must match the Library)
           rm -rf app
-          mkdir -p app/src/main/java/com/geleta/tts
+          mkdir -p app/src/main/java/com/redzoc/ramees/tts/espeak
           mkdir -p app/src/main/res/layout
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
-          mkdir -p app/src/main/assets/geleta-tts-data
+          mkdir -p app/src/main/assets/espeak-ng-data
+          mkdir -p app/src/main/jniLibs
 
-          # 1. UI: የኮፒ እና ሼር በተኖች የተጨመሩበት
-          cat <<EOF > app/src/main/res/layout/activity_main.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="15dp" android:background="#F0F0F0">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GeletaTTS Dashboard" android:textSize="20sp" android:textStyle="bold" android:layout_marginBottom="15dp"/>
-              <Spinner android:id="@+id/langSpinner" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginBottom="15dp"/>
-              <Button android:id="@+id/testButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="የሲስተም ዳታ ፍተሻ" android:layout_marginBottom="10dp"/>
-              
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="10dp">
-                  <Button android:id="@+id/btnCopy" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="ኮፒ (Copy)" android:layout_marginRight="5dp"/>
-                  <Button android:id="@+id/btnShare" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="ሼር (Share)" android:layout_marginLeft="5dp"/>
-              </LinearLayout>
+          # 2. የሊብ ፋይሎችን (Libraries) ወደ ትክክለኛው ቦታ መገልበጥ
+          if [ -f "./lib.zip" ]; then
+            unzip -o "./lib.zip" -d temp_libs/
+            cp -r temp_libs/lib/* app/src/main/jniLibs/
+            rm -rf temp_libs/
+          fi
 
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="የስርዓት ሎግ (Live System Logs):" android:textStyle="bold"/>
-              <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:layout_marginTop="5dp">
-                  <TextView android:id="@+id/logView" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#00FF00" android:padding="10dp" android:fontFamily="monospace" android:text="[System] Logger Ready...\n"/>
-              </ScrollView>
-          </LinearLayout>
-          EOF
+          # 3. የNVDA ዳታ ፋይሎችን (Assets) ወደ አፕሊኬሽኑ መገልበጥ
+          if [ -f "./lang.zip" ]; then
+            unzip -o "./lang.zip" -d app/src/main/assets/espeak-ng-data/
+          fi
+          # ሌሎች የኮምፒውተር ፋይሎች ካሉህ እነሱንም እዚህ ይጨምራቸዋል
+          find . -maxdepth 1 -name "phon*" -exec cp {} app/src/main/assets/espeak-ng-data/ \;
+          find . -maxdepth 1 -name "*_dict" -exec cp {} app/src/main/assets/espeak-ng-data/ \;
 
-          # 2. MainActivity.java (ኮፒ፣ ሼር እና የLive Log መቀበያ)
-          cat <<EOF > app/src/main/java/com/geleta/tts/MainActivity.java
-          package com.geleta.tts;
-          import android.os.Bundle;
-          import androidx.appcompat.app.AppCompatActivity;
-          import android.widget.*;
-          import android.content.*;
-          import android.content.res.AssetManager;
-          import java.io.IOException;
-          import java.util.*;
-
-          public class MainActivity extends AppCompatActivity {
-              private TextView logView;
-              private BroadcastReceiver logReceiver;
-
-              private void addLog(String msg) { runOnUiThread(() -> logView.append("\n> " + msg)); }
-
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  setContentView(R.layout.activity_main);
-                  
-                  logView = findViewById(R.id.logView);
-                  Spinner spinner = findViewById(R.id.langSpinner);
-                  Button testButton = findViewById(R.id.testButton);
-                  Button btnCopy = findViewById(R.id.btnCopy);
-                  Button btnShare = findViewById(R.id.btnShare);
-
-                  List<String> langs = Arrays.asList("አማርኛ (Amharic)", "Afaan Oromoo (Oromo)", "English");
-                  ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, langs);
-                  adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                  spinner.setAdapter(adapter);
-
-                  testButton.setOnClickListener(v -> checkVoiceData());
-
-                  // የኮፒ በተን ስራ
-                  btnCopy.setOnClickListener(v -> {
-                      ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                      ClipData clip = ClipData.newPlainText("GeletaTTS Log", logView.getText().toString());
-                      clipboard.setPrimaryClip(clip);
-                      Toast.makeText(this, "ሎጉ ኮፒ ተደርጓል!", Toast.LENGTH_SHORT).show();
-                  });
-
-                  // የሼር በተን ስራ
-                  btnShare.setOnClickListener(v -> {
-                      Intent sendIntent = new Intent();
-                      sendIntent.setAction(Intent.ACTION_SEND);
-                      sendIntent.putExtra(Intent.EXTRA_TEXT, logView.getText().toString());
-                      sendIntent.setType("text/plain");
-                      startActivity(Intent.createChooser(sendIntent, "ሎጉን ሼር አድርግ..."));
-                  });
-
-                  // ከTTS ሞተር የሚመጡ መልዕክቶችን (Live Logs) ለመቀበል
-                  logReceiver = new BroadcastReceiver() {
-                      @Override
-                      public void onReceive(Context context, Intent intent) {
-                          String msg = intent.getStringExtra("msg");
-                          if(msg != null) addLog("⚙️ " + msg);
-                      }
-                  };
-                  registerReceiver(logReceiver, new IntentFilter("com.geleta.tts.LOG_EVENT"), Context.RECEIVER_EXPORTED);
-              }
-
-              @Override
-              protected void onDestroy() {
-                  super.onDestroy();
-                  unregisterReceiver(logReceiver);
-              }
-
-              private void checkVoiceData() {
-                  AssetManager am = getAssets();
-                  try {
-                      String[] files = am.list("geleta-tts-data");
-                      if (files == null || files.length == 0) addLog("⚠️ ምንም ፋይል የለም!");
-                      else addLog("✅ " + files.length + " ፋይሎች አሉ።");
-                  } catch (IOException e) { addLog("❌ ስህተት: " + e.getMessage()); }
-              }
+          # 4. Native Engine Wrapper (ይህ ነው ሞተሩን የሚቀሰቅሰው)
+          cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/SpeechSynthesis.java
+          package com.redzoc.ramees.tts.espeak;
+          public class SpeechSynthesis {
+              static { System.loadLibrary("ttsespeak"); }
+              public static native int nativeCreate();
+              public static native int nativeSetLanguage(String lang, String country, String variant);
+              public static native int nativeSynthesize(String text, String filename);
+              public static native void nativeStop();
           }
           EOF
 
-          # 3. GeletaTtsService.java (ስልክህ ምን እያዘዘው እንደሆነ ወደ UI ይልካል)
-          cat <<EOF > app/src/main/java/com/geleta/tts/GeletaTtsService.java
-          package com.geleta.tts;
+          # 5. GeletaTtsService.java (ድምጽ የሚያወጣው ክፍል)
+          cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/GeletaTtsService.java
+          package com.redzoc.ramees.tts.espeak;
           import android.speech.tts.*;
           import android.content.Intent;
+          import android.util.Log;
 
           public class GeletaTtsService extends TextToSpeechService {
-              
-              private void sendLog(String msg) {
-                  Intent intent = new Intent("com.geleta.tts.LOG_EVENT");
-                  intent.putExtra("msg", msg);
-                  sendBroadcast(intent);
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  SpeechSynthesis.nativeCreate();
               }
 
               @Override protected int onIsLanguageAvailable(String l, String c, String v) { return TextToSpeech.LANG_AVAILABLE; }
               @Override protected String[] onGetLanguage() { return new String[]{"amh", "ETH", ""}; }
-              @Override protected int onLoadLanguage(String l, String c, String v) { return 1; }
-              @Override protected void onStop() {}
+              @Override protected int onLoadLanguage(String l, String c, String v) { 
+                  return SpeechSynthesis.nativeSetLanguage(l, c, v);
+              }
+              @Override protected void onStop() { SpeechSynthesis.nativeStop(); }
               
               @Override 
               protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) { 
                   String text = request.getCharSequenceText().toString();
-                  sendLog("TalkBack ይህን ልኳል: '" + text + "'");
-                  sendLog("ማስጠንቀቂያ: ድምጽ የሚቀይር ፋብሪካ (C++ Lib) የለም! ዝምታ...");
-                  
+                  // ለጊዜው ሞተሩን ለመቀስቀስ ሙከራ
                   callback.start(16000, android.media.AudioFormat.ENCODING_PCM_16BIT, 1);
-                  // እዚህ ጋር ምንም የድምጽ ዳታ ስላልሰጠነው ሲስተሙ ወደ ሳምሰንግ ይመለሳል
+                  SpeechSynthesis.nativeSynthesize(text, null);
                   callback.done(); 
               }
           }
           EOF
 
-          # 4. CheckVoiceData.java (አንድሮይድን ለማሳመን)
-          cat <<EOF > app/src/main/java/com/geleta/tts/CheckVoiceData.java
-          package com.geleta.tts;
-          import android.app.Activity;
-          import android.content.Intent;
-          import android.os.Bundle;
-          import android.speech.tts.TextToSpeech;
-          import java.util.ArrayList;
-
-          public class CheckVoiceData extends Activity {
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  ArrayList<String> voices = new ArrayList<>();
-                  voices.add("amh-ETH"); voices.add("orm-ETH"); voices.add("eng-USA");
-                  Intent returnData = new Intent();
-                  returnData.putStringArrayListExtra(TextToSpeech.Engine.EXTRA_AVAILABLE_VOICES, voices);
-                  setResult(TextToSpeech.Engine.CHECK_VOICE_DATA_PASS, returnData);
-                  finish();
-              }
-          }
-          EOF
-
-          # የቋንቋ ፋይሎች ካሉ መገልበጥ
-          if [ -f "./lang.zip" ]; then
-            unzip -o "./lang.zip" -d temp_lang/
-            find temp_lang/ -type f -exec cp -v {} app/src/main/assets/geleta-tts-data/ \;
-            rm -rf temp_lang/
-          else
-            echo "Dummy" > app/src/main/assets/geleta-tts-data/dummy.dat
-          fi
-
-          # 5. Manifest እና አጠቃላይ ቅንጅቶች
+          # 6. UI እና Manifest (ስሙ የተቀየረ)
           cat <<EOF > app/src/main/AndroidManifest.xml
-          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="GeletaTTS" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-                  <activity android:name=".MainActivity" android:exported="true">
-                      <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
-                  </activity>
-                  <activity android:name=".CheckVoiceData" android:exported="true">
-                      <intent-filter><action android:name="android.speech.tts.engine.CHECK_TTS_DATA" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
-                  </activity>
-                  <service android:name=".GeletaTtsService" android:label="Geleta Multi-Lang TTS" android:exported="true" android:permission="android.permission.BIND_TTS_SERVICE">
+              <application android:label="GeletaTTS Pro" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                  <service android:name=".GeletaTtsService" android:label="Geleta Engine (NVDA+Android)" android:exported="true" android:permission="android.permission.BIND_TTS_SERVICE">
                       <intent-filter priority="1000"><action android:name="android.intent.action.TTS_SERVICE" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
                       <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
                   </service>
@@ -224,24 +113,24 @@ jobs:
 
           echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
           echo "include ':app'" > settings.gradle
-          echo "rootProject.name = 'GeletaTTS'" >> settings.gradle
-          cat <<EOF > build.gradle
-          buildscript { repositories { google(); mavenCentral() }; dependencies { classpath 'com.android.tools.build:gradle:8.1.1' } }
-          allprojects { repositories { google(); mavenCentral() } }
-          EOF
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application' }
-          android { namespace 'com.geleta.tts'; compileSdk 34; defaultConfig { applicationId "com.geleta.tts"; minSdk 21; targetSdk 34; versionCode 1; versionName "1.0" } }
+          android { 
+              namespace 'com.redzoc.ramees.tts.espeak'
+              compileSdk 34
+              defaultConfig { 
+                  applicationId "com.redzoc.ramees.tts.espeak"
+                  minSdk 21; targetSdk 34; versionCode 1; versionName "1.0"
+              }
+          }
           dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
           EOF
-          echo "android.useAndroidX=true" > gradle.properties
 
       - name: Build APK
-        run: |
-          gradle assembleDebug --stacktrace
+        run: gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GeletaTTS-App
+          name: GeletaTTS-Full-Engine
           path: app/build/outputs/apk/debug/*.apk
