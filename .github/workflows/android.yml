@@ -29,9 +29,8 @@ jobs:
 
       - name: Integrate Engine and Data
         run: |
-          echo "--- ሞተሩን እና ዳታውን የማዋሃድ ስራ ---"
+          echo "--- የፋይል መዋቅር እና ዝግጅት ---"
           
-          # 1. አዲሱን የአፕ ስም እና ፎልደር መፍጠር (Package Name must match the Library)
           rm -rf app
           mkdir -p app/src/main/java/com/redzoc/ramees/tts/espeak
           mkdir -p app/src/main/res/layout
@@ -40,22 +39,21 @@ jobs:
           mkdir -p app/src/main/assets/espeak-ng-data
           mkdir -p app/src/main/jniLibs
 
-          # 2. የሊብ ፋይሎችን (Libraries) ወደ ትክክለኛው ቦታ መገልበጥ
+          # የሊብ ፋይሎችን (Libraries) ማዘጋጀት
           if [ -f "./lib.zip" ]; then
             unzip -o "./lib.zip" -d temp_libs/
             cp -r temp_libs/lib/* app/src/main/jniLibs/
             rm -rf temp_libs/
           fi
 
-          # 3. የNVDA ዳታ ፋይሎችን (Assets) ወደ አፕሊኬሽኑ መገልበጥ
+          # የNVDA ዳታ ፋይሎችን (Assets) ማዘጋጀት
           if [ -f "./lang.zip" ]; then
             unzip -o "./lang.zip" -d app/src/main/assets/espeak-ng-data/
           fi
-          # ሌሎች የኮምፒውተር ፋይሎች ካሉህ እነሱንም እዚህ ይጨምራቸዋል
           find . -maxdepth 1 -name "phon*" -exec cp {} app/src/main/assets/espeak-ng-data/ \;
           find . -maxdepth 1 -name "*_dict" -exec cp {} app/src/main/assets/espeak-ng-data/ \;
 
-          # 4. Native Engine Wrapper (ይህ ነው ሞተሩን የሚቀሰቅሰው)
+          # 1. Native Engine Wrapper
           cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/SpeechSynthesis.java
           package com.redzoc.ramees.tts.espeak;
           public class SpeechSynthesis {
@@ -67,31 +65,18 @@ jobs:
           }
           EOF
 
-          # 5. GeletaTtsService.java (ድምጽ የሚያወጣው ክፍል)
+          # 2. GeletaTtsService.java
           cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/GeletaTtsService.java
           package com.redzoc.ramees.tts.espeak;
           import android.speech.tts.*;
-          import android.content.Intent;
-          import android.util.Log;
-
           public class GeletaTtsService extends TextToSpeechService {
-              @Override
-              public void onCreate() {
-                  super.onCreate();
-                  SpeechSynthesis.nativeCreate();
-              }
-
+              @Override public void onCreate() { super.onCreate(); SpeechSynthesis.nativeCreate(); }
               @Override protected int onIsLanguageAvailable(String l, String c, String v) { return TextToSpeech.LANG_AVAILABLE; }
               @Override protected String[] onGetLanguage() { return new String[]{"amh", "ETH", ""}; }
-              @Override protected int onLoadLanguage(String l, String c, String v) { 
-                  return SpeechSynthesis.nativeSetLanguage(l, c, v);
-              }
+              @Override protected int onLoadLanguage(String l, String c, String v) { return SpeechSynthesis.nativeSetLanguage(l, c, v); }
               @Override protected void onStop() { SpeechSynthesis.nativeStop(); }
-              
-              @Override 
-              protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) { 
+              @Override protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) { 
                   String text = request.getCharSequenceText().toString();
-                  // ለጊዜው ሞተሩን ለመቀስቀስ ሙከራ
                   callback.start(16000, android.media.AudioFormat.ENCODING_PCM_16BIT, 1);
                   SpeechSynthesis.nativeSynthesize(text, null);
                   callback.done(); 
@@ -99,20 +84,27 @@ jobs:
           }
           EOF
 
-          # 6. UI እና Manifest (ስሙ የተቀየረ)
-          cat <<EOF > app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <application android:label="GeletaTTS Pro" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-                  <service android:name=".GeletaTtsService" android:label="Geleta Engine (NVDA+Android)" android:exported="true" android:permission="android.permission.BIND_TTS_SERVICE">
-                      <intent-filter priority="1000"><action android:name="android.intent.action.TTS_SERVICE" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
-                      <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
-                  </service>
-              </application>
-          </manifest>
+          # 3. Settings.gradle (ማከማቻዎቹን እዚህ ጋር እናስተካክላለን)
+          cat <<EOF > settings.gradle
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories { google(); mavenCentral() }
+          }
+          include ':app'
           EOF
 
-          echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
-          echo "include ':app'" > settings.gradle
+          # 4. Root build.gradle
+          cat <<EOF > build.gradle
+          plugins {
+              id 'com.android.application' version '8.1.1' apply false
+              id 'com.android.library' version '8.1.1' apply false
+          }
+          EOF
+
+          # 5. App build.gradle
           cat <<EOF > app/build.gradle
           plugins { id 'com.android.application' }
           android { 
@@ -120,17 +112,33 @@ jobs:
               compileSdk 34
               defaultConfig { 
                   applicationId "com.redzoc.ramees.tts.espeak"
-                  minSdk 21; targetSdk 34; versionCode 1; versionName "1.0"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
               }
           }
           dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
           EOF
 
+          # 6. Manifest
+          cat <<EOF > app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:label="GeletaTTS Pro" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                  <service android:name=".GeletaTtsService" android:label="Geleta Engine" android:exported="true" android:permission="android.permission.BIND_TTS_SERVICE">
+                      <intent-filter priority="1000"><action android:name="android.intent.action.TTS_SERVICE" /><category android:name="android.intent.category.DEFAULT" /></intent-filter>
+                      <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
+          echo '<?xml version="1.0" encoding="utf-8"?><tts-engine xmlns:android="http://schemas.android.com/apk/res/android" />' > app/src/main/res/xml/tts_engine.xml
+
       - name: Build APK
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GeletaTTS-Full-Engine
+          name: GeletaTTS-Full
           path: app/build/outputs/apk/debug/*.apk
