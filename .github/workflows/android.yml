@@ -27,11 +27,10 @@ jobs:
         with:
           gradle-version: 8.4
 
-      - name: Super Smart File Organizer
+      - name: Advanced Organizer and Crash Protector
         run: |
-          echo "--- ፋይሎችን የማደን ስራ ተጀምሯል ---"
+          echo "--- ፋይል ማደራጀት እና ኮድ ማዘጋጀት ተጀምሯል ---"
           
-          # 1. አዲሱን መዋቅር ማዘጋጀት
           rm -rf app
           mkdir -p app/src/main/java/com/redzoc/ramees/tts/espeak
           mkdir -p app/src/main/res/values
@@ -39,32 +38,26 @@ jobs:
           mkdir -p app/src/main/assets/espeak-ng-data
           mkdir -p app/src/main/jniLibs
 
-          # 2. ብልህ የፋይል ፍለጋ (Deep Hunting)
-          # የትም ያለን ዚፕ ፋይል ፈልጎ ይከፍታል
+          # ዚፖችን መክፈት
           find . -name "*.zip" -not -path "./app/*" | while read zipfile; do
-            echo "ዚፕ ተገኝቷል፡ $zipfile"
             unzip -o "$zipfile" -d temp_extracted/
           done
 
-          # 3. የሊብ ፋይሎችን (.so) በብልሃት ማደራጀት
-          # በዚፕም ይሁን በሪፖዚተሪው ውስጥ ያሉ የ .so ፋይሎችን ABI ፎልደራቸውን ጠብቆ ይገለብጣል
+          # የሊብ (.so) ፋይሎችን ማደራጀት
           find . -name "*.so" -not -path "./app/*" | while read sofile; do
             abi=$(basename $(dirname "$sofile"))
-            # ABI መሆኑን ለማረጋገጥ (ካልሆነ ወደ armeabi-v7a ይልከዋል)
-            if [[ "$abi" != "armeabi-v7a" && "$abi" != "arm64-v8a" && "$abi" != "x86" && "$abi" != "x86_64" ]]; then
+            if [[ "$abi" != "armeabi-v7a" && "$abi" != "arm64-v8a" && "$abi" != "x86" && "$abi" != "x86_64" && "$abi" != "armeabi" && "$abi" != "mips" ]]; then
               abi="armeabi-v7a"
             fi
             mkdir -p "app/src/main/jniLibs/$abi"
             cp "$sofile" "app/src/main/jniLibs/$abi/"
           done
 
-          # 4. የዳታ ፋይሎችን (Assets) ማደራጀት
-          # NVDA ዳታዎችን እና የድምጽ ፋይሎችን ፈልጎ ወደ assets ይልካል
+          # የዳታ ፋይሎችን ወደ assets መላክ
           find . -type f \( -name "phon*" -o -name "*_dict" -o -name "config" -o -name "*.dat" \) -not -path "./app/*" | while read assetfile; do
             cp "$assetfile" app/src/main/assets/espeak-ng-data/
           done
 
-          # 5. አስፈላጊ የሆኑ የቅንጅት ፋይሎችን መፍጠር (ይህ ለግንባታው ወሳኝ ነው)
           cat <<EOF > gradle.properties
           android.useAndroidX=true
           android.enableJetifier=true
@@ -74,23 +67,19 @@ jobs:
           <resources><string name="app_name">GeletaTTS Pro</string></resources>
           EOF
 
-          cat <<EOF > app/src/main/res/values/colors.xml
-          <resources>
-              <color name="colorPrimary">#6200EE</color>
-              <color name="colorPrimaryDark">#3700B3</color>
-              <color name="colorAccent">#03DAC5</color>
-          </resources>
-          EOF
-
           cat <<EOF > app/src/main/res/values/styles.xml
           <resources><style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar"></style></resources>
           EOF
 
-          # 6. የጃቫ ኮድ (መቀየር የሌለበት)
+          # የተሻሻለው የጃቫ ሞተር ኮድ (Crash Protector የተጨመረበት)
           cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/SpeechSynthesis.java
           package com.redzoc.ramees.tts.espeak;
+          import android.util.Log;
           public class SpeechSynthesis {
-              static { System.loadLibrary("ttsespeak"); }
+              static { 
+                  try { System.loadLibrary("ttsespeak"); } 
+                  catch (Throwable e) { Log.e("GeletaTTS", "Library Load Error", e); }
+              }
               public static native int nativeCreate();
               public static native int nativeSetLanguage(String lang, String country, String variant);
               public static native int nativeSynthesize(String text, String filename);
@@ -98,24 +87,63 @@ jobs:
           }
           EOF
 
+          # ዳታውን ወደ ስልክ ሜሞሪ አውጪው ኮድ (Data Extractor)
           cat <<EOF > app/src/main/java/com/redzoc/ramees/tts/espeak/GeletaTtsService.java
           package com.redzoc.ramees.tts.espeak;
           import android.speech.tts.*;
+          import java.io.*;
+          import android.util.Log;
+
           public class GeletaTtsService extends TextToSpeechService {
-              @Override public void onCreate() { super.onCreate(); try { SpeechSynthesis.nativeCreate(); } catch(Exception e) {} }
+              @Override public void onCreate() { 
+                  super.onCreate(); 
+                  try { 
+                      copyDataToStorage();
+                      SpeechSynthesis.nativeCreate(); 
+                  } catch(Throwable e) { Log.e("GeletaTTS", "Engine Start Error", e); } 
+              }
+
+              private void copyDataToStorage() {
+                  String destPath = getFilesDir().getAbsolutePath() + "/espeak-ng-data";
+                  File dir = new File(destPath);
+                  if (!dir.exists()) {
+                      dir.mkdirs();
+                      copyAssetFolder("espeak-ng-data", destPath);
+                  }
+              }
+
+              private void copyAssetFolder(String srcPath, String destPath) {
+                  try {
+                      String[] files = getAssets().list(srcPath);
+                      if (files != null && files.length == 0) {
+                          InputStream in = getAssets().open(srcPath);
+                          OutputStream out = new FileOutputStream(destPath);
+                          byte[] buffer = new byte[1024]; int read;
+                          while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+                          in.close(); out.close();
+                      } else if (files != null) {
+                          new File(destPath).mkdirs();
+                          for (String file : files) copyAssetFolder(srcPath + "/" + file, destPath + "/" + file);
+                      }
+                  } catch (Exception e) { Log.e("GeletaTTS", "File Copy Error", e); }
+              }
+
               @Override protected int onIsLanguageAvailable(String l, String c, String v) { return TextToSpeech.LANG_AVAILABLE; }
               @Override protected String[] onGetLanguage() { return new String[]{"amh", "ETH", ""}; }
-              @Override protected int onLoadLanguage(String l, String c, String v) { return SpeechSynthesis.nativeSetLanguage(l, c, v); }
-              @Override protected void onStop() { SpeechSynthesis.nativeStop(); }
+              @Override protected int onLoadLanguage(String l, String c, String v) { 
+                  try { return SpeechSynthesis.nativeSetLanguage(l, c, v); } catch(Throwable t) { return TextToSpeech.LANG_NOT_SUPPORTED; }
+              }
+              @Override protected void onStop() { try { SpeechSynthesis.nativeStop(); } catch(Throwable t){} }
               @Override protected void onSynthesizeText(SynthesisRequest request, SynthesisCallback callback) { 
-                  callback.start(16000, android.media.AudioFormat.ENCODING_PCM_16BIT, 1);
-                  SpeechSynthesis.nativeSynthesize(request.getCharSequenceText().toString(), null);
-                  callback.done(); 
+                  try {
+                      callback.start(16000, android.media.AudioFormat.ENCODING_PCM_16BIT, 1);
+                      SpeechSynthesis.nativeSynthesize(request.getCharSequenceText().toString(), null);
+                      callback.done(); 
+                  } catch(Throwable t) { callback.error(); }
               }
           }
           EOF
 
-          # 7. Manifest እና Build ቅንጅቶች
           cat <<EOF > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application android:label="@string/app_name" android:theme="@style/AppTheme">
@@ -145,10 +173,8 @@ jobs:
               compileSdk 34
               defaultConfig { 
                   applicationId "com.redzoc.ramees.tts.espeak"
-                  minSdk 21
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  minSdk 21; targetSdk 34; versionCode 2; versionName "1.1"
+                  ndk { abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64', 'mips', 'armeabi' }
               }
           }
           dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
@@ -160,5 +186,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GeletaTTS-Final-Pro
+          name: GeletaTTS-CrashFree-Build
           path: app/build/outputs/apk/debug/*.apk
